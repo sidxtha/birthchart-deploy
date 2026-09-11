@@ -81,6 +81,7 @@ function App() {
       cancelled = true;
       clearTimeout(timer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cityQuery]);
 
   const handleCitySelect = (city) => {
