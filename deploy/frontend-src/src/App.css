@@ -52,7 +52,7 @@ html, body {
   }
 }
 
-/* CRITICAL FIX: Prevents child SVG/tables from blowing out CSS Grid on mobile */
+/* Prevents grid blowout on mobile while preserving desktop column bounds */
 .dashboard > *,
 .left-column,
 .middle-column,
@@ -102,7 +102,7 @@ html, body {
 
 
 /* ==========================================================================
-   3. HEADER & HERO
+   3. HEADER & HERO (FIXED DESKTOP & MOBILE FLEXBOX)
    ========================================================================== */
 
 .header {
@@ -231,14 +231,18 @@ html, body {
   z-index: 2;
   gap: 36px;
   width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
-@media (min-width: 1000px) {
+@media (min-width: 992px) {
   .hero {
     flex-direction: row;
     text-align: left;
     justify-content: space-between;
-    padding: 72px 32px 48px;
+    align-items: center;
+    padding: 60px 32px 48px;
+    gap: 48px;
   }
 }
 
@@ -246,13 +250,14 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  max-width: 640px;
   width: 100%;
+  max-width: 640px;
 }
 
-@media (min-width: 1000px) {
+@media (min-width: 992px) {
   .hero-content {
     align-items: flex-start;
+    flex: 1 1 55%;
   }
 }
 
@@ -280,7 +285,7 @@ html, body {
 
 @media (min-width: 768px) {
   .hero h1 {
-    font-size: 2.6rem;
+    font-size: 2.8rem;
   }
 }
 
@@ -300,7 +305,7 @@ html, body {
   max-width: 560px;
 }
 
-@media (min-width: 1000px) {
+@media (min-width: 992px) {
   .hero p {
     margin: 0 0 28px 0;
   }
@@ -315,7 +320,7 @@ html, body {
   width: 100%;
 }
 
-@media (min-width: 1000px) {
+@media (min-width: 992px) {
   .hero-buttons {
     justify-content: flex-start;
   }
@@ -363,14 +368,13 @@ html, body {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 16px;
+  gap: 16px 24px;
   width: 100%;
 }
 
-@media (min-width: 1000px) {
+@media (min-width: 992px) {
   .hero-features {
     justify-content: flex-start;
-    gap: 24px;
   }
 }
 
@@ -381,6 +385,7 @@ html, body {
   color: #b8b8d2;
   font-size: 0.88rem;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .feature-item svg {
@@ -391,16 +396,21 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
   width: 100%;
+}
+
+@media (min-width: 992px) {
+  .hero-right {
+    flex: 1 1 45%;
+    width: auto;
+  }
 }
 
 .hero-card {
   position: relative;
   width: 280px;
   height: 280px;
-  max-width: 80vw;
-  max-height: 80vw;
+  max-width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -408,8 +418,15 @@ html, body {
 
 @media (min-width: 768px) {
   .hero-card {
-    width: 320px;
-    height: 320px;
+    width: 360px;
+    height: 360px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .hero-card {
+    width: 420px;
+    height: 420px;
   }
 }
 
@@ -590,7 +607,6 @@ html, body {
   color: #616182;
 }
 
-/* Primary Button Component */
 .btn {
   background: linear-gradient(135deg, #f5b93d 0%, #7b61ff 100%);
   border: none;
@@ -621,7 +637,6 @@ html, body {
   width: 100%;
 }
 
-/* Dasha AI Button Component */
 .dasha-btn {
   background: linear-gradient(135deg, #f5b93d 0%, #7b61ff 100%);
   border: none;
@@ -683,7 +698,6 @@ html, body {
   display: inline-block;
 }
 
-/* Custom Select Component */
 .select-wrapper {
   position: relative;
   width: 100%;
@@ -836,7 +850,6 @@ html, body {
    7. TABLES, BADGES & STATS
    ========================================================================== */
 
-/* Responsive Table Wrapper */
 .table-wrapper {
   width: 100%;
   overflow-x: auto;
@@ -888,7 +901,6 @@ html, body {
   width: 100%;
 }
 
-/* Stats Component Layout */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -966,7 +978,7 @@ html, body {
 
 
 /* ==========================================================================
-   8. BIRTH CHART STYLING (FIXES MOBILE SVG OVERFLOW)
+   8. BIRTH CHART STYLING
    ========================================================================== */
 
 .chart-wrapper,
@@ -1116,7 +1128,6 @@ html, body {
   }
 }
 
-/* Expanded Chatbot Mobile Safety Fix */
 .chatbot-card.expanded {
   position: fixed;
   top: 16px;
