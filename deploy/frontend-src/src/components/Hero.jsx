@@ -7,7 +7,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 
-export default function Hero() {
+export default function Hero({ onGenerateClick }) {
   return (
     <section className="hero">
 
@@ -43,12 +43,12 @@ export default function Hero() {
 
         <div className="hero-buttons">
 
-          <button className="hero-primary">
+          <button className="hero-primary" onClick={onGenerateClick}>
             Generate Birth Chart
             <ArrowRight size={18} />
           </button>
 
-          <button className="hero-secondary">
+          <button className="hero-secondary" onClick={onGenerateClick}>
             Learn More
           </button>
 

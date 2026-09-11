@@ -1,282 +1,195 @@
-import React, { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  Sparkles,
-  Send,
-  User,
-  Bot,
-  Maximize2,
-  Minimize2,
-} from "lucide-react";
+import React, { useState, useRef, useEffect } from 'react';
+import { fetchChatReply } from './api';
 
-const SUGGESTIONS = [
-  "What does my career look like?",
-  "When am I likely to get married?",
-  "What are my biggest strengths?",
-  "What should I focus on this year?",
-];
-
-function formatTime(date) {
-  return date.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-export default function ChatBot({ chart }) {
+const ChatBot = ({ chart }) => {
   const [messages, setMessages] = useState([
     {
-      role: "assistant",
-      content:
-        "Hello! I'm Dasha AI. Ask me anything about your birth chart, relationships, career, finances, or life path.",
-      time: formatTime(new Date()),
-    },
+      id: 1,
+      sender: 'bot',
+      text: 'Namaste! I am Dasha AI, your cosmic assistant. Ask me anything about your birth chart, planetary positions, or upcoming transits.',
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
   ]);
+  const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const messagesEndRef = useRef(null);
 
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-  const [error, setError] = useState("");
+  const suggestions = [
+    "What does my Sun sign indicate?",
+    "Tell me about my 7th House relationships",
+    "How do current transits affect my career?"
+  ];
 
-  const bottomRef = useRef(null);
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({
-      behavior: "smooth",
-    });
-  }, [messages, loading]);
+    scrollToBottom();
+  }, [messages, isTyping]);
 
-  async function send(questionText) {
-    const question = (questionText ?? input).trim();
+  const handleSend = async (textToSend) => {
+    const query = typeof textToSend === 'string' ? textToSend : input;
+    if (!query.trim()) return;
 
-    if (!question || loading) return;
+    const userTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    const userMessage = {
-      role: "user",
-      content: question,
-      time: formatTime(new Date()),
+    // 1. Add user message
+    const userMsg = {
+      id: Date.now(),
+      sender: 'user',
+      text: query,
+      time: userTime
     };
 
-    const history = [...messages, userMessage];
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
+    if (typeof textToSend !== 'string') setInput('');
+    setIsTyping(true);
 
-    setMessages(history);
-    setInput("");
-    setLoading(true);
-    setError("");
+    // 2. If there's no chart yet, the backend has nothing to reason about —
+    // answer locally instead of calling the API.
+    if (!chart) {
+      setTimeout(() => {
+        const botTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now() + 1,
+            sender: 'bot',
+            text: 'Generate your birth chart above first, then ask me anything about it!',
+            time: botTime,
+          },
+        ]);
+        setIsTyping(false);
+      }, 500);
+      return;
+    }
+
+    // 3. Ask the backend (Gemini-powered) for a real answer, grounded in
+    // the generated chart. History excludes the initial greeting.
+    const history = updatedMessages
+      .slice(1)
+      .map((m) => ({
+        role: m.sender === 'user' ? 'user' : 'assistant',
+        content: m.text,
+      }));
 
     try {
-      const response = await fetch(
-        `${process.env.REACT_APP_API_URL || "http://127.0.0.1:8001"}/chat`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            chart,
-            question,
-            history: messages,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Unable to contact AI.");
-      }
-
-      const data = await response.json();
-
+      const reply = await fetchChatReply({ chart, question: query, history });
+      const botTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setMessages((prev) => [
+        ...prev,
+        { id: Date.now() + 1, sender: 'bot', text: reply, time: botTime },
+      ]);
+    } catch (err) {
+      const botTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       setMessages((prev) => [
         ...prev,
         {
-          role: "assistant",
-          content: data.reply,
-          time: formatTime(new Date()),
+          id: Date.now() + 1,
+          sender: 'bot',
+          text: `Sorry, I couldn't get a reply: ${err.message || 'unknown error'}`,
+          time: botTime,
         },
       ]);
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        "Unable to get a response. Is your backend running?"
-      );
     } finally {
-      setLoading(false);
+      setIsTyping(false);
     }
-  }
-
-  function handleKeyDown(e) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      send();
-    }
-  }
+  };
 
   return (
-    <motion.div
-      className={`chatbot ${expanded ? "expanded" : ""}`}
-      initial={{ opacity: 0, x: 40 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <div className="chat-header">
-
-        <div className="chat-title">
-
-          <div className="chat-logo">
-            <Sparkles size={18} />
+    <div className={`chatbot-card ${isExpanded ? 'expanded' : ''}`}>
+      {/* Header */}
+      <div className="chatbot-header">
+        <div className="chatbot-header-info">
+          <div className="chatbot-avatar-icon">
+            🤖
+            <span className="sparkle-badge">✨</span>
           </div>
-
           <div>
-            <h3>Dasha AI</h3>
-            <span>Astrology Assistant</span>
+            <h3 className="chatbot-title">Dasha AI Assistant</h3>
+            <p className="chatbot-subtitle">Astrology & Transit Guide</p>
           </div>
-
         </div>
-
-        <button
-          className="expand-btn"
-          onClick={() => setExpanded(!expanded)}
+        <button 
+          className="icon-button"
+          onClick={() => setIsExpanded(!isExpanded)}
+          title={isExpanded ? "Collapse View" : "Expand View"}
+          type="button"
         >
-          {expanded ? (
-            <Minimize2 size={18} />
-          ) : (
-            <Maximize2 size={18} />
-          )}
+          {isExpanded ? '↙' : '↗'}
         </button>
-
       </div>
 
-      <div className="chat-body">
-
-        {messages.length === 1 && (
-          <div className="suggestions">
-
-            {SUGGESTIONS.map((item, index) => (
-              <button
-                key={index}
-                onClick={() => send(item)}
-                className="suggestion"
-              >
-                {item}
-              </button>
-            ))}
-
-          </div>
-        )}
-
-        <AnimatePresence>
-
-          {messages.map((message, index) => (
-            <motion.div
+      {/* Quick Suggestion Chips */}
+      {messages.length <= 2 && (
+        <div className="suggestions-container">
+          {suggestions.map((item, index) => (
+            <button
               key={index}
-              className={`message-row ${message.role}`}
-              initial={{
-                opacity: 0,
-                y: 15,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-              }}
-              exit={{
-                opacity: 0,
-              }}
-              transition={{
-                duration: 0.25,
-              }}
+              className="suggestion-chip"
+              onClick={() => handleSend(item)}
+              type="button"
             >
-
-              {message.role === "assistant" && (
-                <div className="avatar ai">
-                  <Bot size={18} />
-                </div>
-              )}
-
-              <div className="message-content">
-
-                <div
-                  className={`bubble ${message.role}`}
-                >
-                  {message.content}
-                </div>
-
-                <small>{message.time}</small>
-
-              </div>
-
-              {message.role === "user" && (
-                <div className="avatar user">
-                  <User size={18} />
-                </div>
-              )}
-
-            </motion.div>
+              ✦ {item}
+            </button>
           ))}
-
-                    {loading && (
-            <motion.div
-              className="message-row assistant"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              <div className="avatar ai">
-                <Bot size={18} />
-              </div>
-
-              <div className="message-content">
-                <div className="bubble assistant typing">
-
-                  <span></span>
-                  <span></span>
-                  <span></span>
-
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-        </AnimatePresence>
-
-        <div ref={bottomRef} />
-
-      </div>
-
-      {error && (
-        <div className="chat-error">
-          {error}
         </div>
       )}
 
-      <div className="chat-footer">
+      {/* Chat Messages */}
+      <div className="chat-messages">
+        {messages.map((msg) => (
+          <div key={msg.id} className={`message-row ${msg.sender}`}>
+            {msg.sender === 'bot' && <div className="bot-avatar">✨</div>}
+            <div className="message-bubble-wrapper">
+              <div className="message-bubble">{msg.text}</div>
+              <span className="message-time">{msg.time}</span>
+            </div>
+          </div>
+        ))}
 
-        <div className="chat-input">
-
-          <input
-            type="text"
-            placeholder="Ask anything about your birth chart..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={loading}
-          />
-
-          <motion.button
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.94 }}
-            className="send-btn"
-            onClick={() => send()}
-            disabled={loading || !input.trim()}
-          >
-            <Send size={18} />
-          </motion.button>
-
-        </div>
-
+        {/* Typing Dots Animation */}
+        {isTyping && (
+          <div className="message-row bot">
+            <div className="bot-avatar">✨</div>
+            <div className="message-bubble typing-dots">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
       </div>
 
-    </motion.div>
+      {/* Chat Input Form */}
+      <form 
+        className="chat-input-wrapper"
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleSend();
+        }}
+      >
+        <input
+          type="text"
+          className="chat-input"
+          placeholder="Ask Dasha AI about your chart..."
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+        />
+        <button 
+          type="submit" 
+          className="chat-send-btn"
+          disabled={!input.trim()}
+        >
+          ➔
+        </button>
+      </form>
+    </div>
   );
-}
+};
 
-        
+export default ChatBot;

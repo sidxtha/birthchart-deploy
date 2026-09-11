@@ -1,44 +1,50 @@
 import React from "react";
 import { motion } from "framer-motion";
 
-const Card = ({
-  title,
-  subtitle,
-  children,
-  className = "",
-  delay = 0,
-}) => {
+export default function Background() {
   return (
-    <motion.div
-      className={`glass-card ${className}`}
-      initial={{ opacity: 0, y: 25 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{
-        duration: 0.45,
-        delay,
-        ease: "easeOut",
-      }}
-      whileHover={{
-        y: -4,
-      }}
-    >
-      {(title || subtitle) && (
-        <div className="card-header">
-          {title && <h3 className="card-title">{title}</h3>}
+    <div className="background-wrapper">
+      {/* Dark starry gradient layer */}
+      <div className="background-gradient" />
 
-          {subtitle && (
-            <p className="card-subtitle">
-              {subtitle}
-            </p>
-          )}
-        </div>
-      )}
+      {/* Floating ambient purple glow */}
+      <motion.div
+        className="glow"
+        animate={{
+          x: [0, 60, 0],
+          y: [0, -50, 0],
+        }}
+        transition={{
+          repeat: Infinity,
+          duration: 18,
+          ease: "easeInOut",
+        }}
+        style={{
+          background: "#7b61ff",
+          top: "-180px",
+          left: "-120px",
+        }}
+      />
 
-      <div className="card-content">
-        {children}
-      </div>
-    </motion.div>
+      {/* Floating ambient gold glow */}
+      <motion.div
+        className="glow"
+        animate={{
+          x: [0, -60, 0],
+          y: [0, 50, 0],
+        }}
+        transition={{
+          repeat: Infinity,
+          duration: 22,
+          ease: "easeInOut",
+          delay: 2,
+        }}
+        style={{
+          background: "#f5b93d",
+          right: "-180px",
+          bottom: "-120px",
+        }}
+      />
+    </div>
   );
-};
-
-export default Card;
+}
