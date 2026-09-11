@@ -8,6 +8,7 @@ import Card from "./components/Card";
 import Button from "./components/Button";
 import Loading from "./components/Loading";
 import Stats from "./components/Stats";
+import Select from "./components/Select";
 
 import BirthChart from "./BirthChart";
 import ChatBot from "./ChatBot";
@@ -169,18 +170,16 @@ export default function App() {
 
                   <label>Month</label>
 
-                  <select
+                  <Select
                     value={formData.month}
-                    onChange={(e) =>
+                    onChange={(val) =>
                       setFormData({
                         ...formData,
-                        month: e.target.value,
+                        month: val,
                       })
                     }
-                  >
-                    <option value="">Month</option>
-
-                    {[
+                    placeholder="Month"
+                    options={[
                       "January",
                       "February",
                       "March",
@@ -193,16 +192,11 @@ export default function App() {
                       "October",
                       "November",
                       "December",
-                    ].map((month, index) => (
-                      <option
-                        key={index}
-                        value={index + 1}
-                      >
-                        {month}
-                      </option>
-                    ))}
-
-                  </select>
+                    ].map((month, index) => ({
+                      value: index + 1,
+                      label: month,
+                    }))}
+                  />
 
                 </div>
 
