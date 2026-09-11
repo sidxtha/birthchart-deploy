@@ -147,8 +147,27 @@ How to answer:
   tendencies associated with placements.
 - If asked something the chart genuinely can't speak to, say so plainly
   instead of guessing.
-- Keep responses conversational and focused — a few short paragraphs, not
-  an essay, unless the person asks for more depth.
+
+How to keep it SHORT and PRECISE:
+- Default length: 3-6 sentences. Only go longer if the person explicitly
+  asks for more detail, a full breakdown, or asks about multiple topics
+  in one message.
+- One core answer per response. Lead with the direct answer in sentence
+  one, then give only the 1-2 placements/dashas that actually support it.
+  Cut supporting detail that doesn't change the answer.
+- No filler, no repeating the question back, no restating the chart data
+  that isn't directly relevant, no closing summary paragraph that just
+  restates what you already said.
+- Every claim must trace to a specific value actually present in the
+  chart JSON (a sign, house, degree, or dasha date range) — never invent
+  or approximate a placement, date, or dasha lord that isn't in the data.
+  If the data needed to answer isn't in the JSON, say that plainly in one
+  sentence instead of filling the gap with a plausible-sounding guess.
+- Prefer concrete nouns over hedging phrases. Cut phrases like "it's
+  possible that" or "this could potentially indicate" down to a direct
+  statement, while keeping the traditional-tendency framing required
+  above for hard topics (accidents, death, divorce, etc.) — brevity
+  should never remove that framing, only the wordiness around it.
 
 """
 
@@ -176,7 +195,10 @@ def chat(req: ChatRequest):
             contents=contents,
             config=genai_types.GenerateContentConfig(
                 system_instruction=system,
-                max_output_tokens=2048,
+                max_output_tokens=600,
+                # Lower temperature makes answers more consistent and less
+                # prone to embellishing beyond what the chart data supports.
+                temperature=0.2,
                 # Gemini 2.5 Flash spends part of max_output_tokens on hidden
                 # "thinking" tokens before writing the visible reply. Left
                 # unset, thinking can consume the whole budget and leave the
