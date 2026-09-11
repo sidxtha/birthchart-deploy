@@ -3,3 +3,6 @@ uvicorn[standard]
 python-dotenv
 google-genai
 pydantic
+pyswisseph
+timezonefinder
+pytz
