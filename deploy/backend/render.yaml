@@ -1,23 +1,15 @@
-# Single-service deployment: builds the React frontend into a static
-# `build/` folder, then runs the FastAPI backend, which serves that build
-# folder itself (see the StaticFiles mount at the bottom of backend/main.py).
-# One Render service, one URL, no CORS/env-var wiring between two services.
-#
-# In Render: New > Blueprint, point it at this repo, and it will read this
-# file automatically. Root of the repo should contain this deploy/ folder
-# (or set the Blueprint's root directory to wherever this file lives).
 services:
   - type: web
     name: birthchart-app
     env: python
-    rootDir: deploy
     buildCommand: >
       cd frontend-src &&
       npm install &&
       npm run build &&
-      cd ../backend &&
+      cp -r build ../deploy/backend/build &&
+      cd ../deploy/backend &&
       pip install -r requirements.txt
-    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: cd deploy/backend && uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: GEMINI_API_KEY
         sync: false

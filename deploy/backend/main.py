@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -46,8 +47,7 @@ def get_chart(data: BirthData):
     )
     return result
 
-# Health check (moved off "/" — that path now serves the React frontend,
-# see the StaticFiles mount at the bottom of this file)
+# Health check
 @app.get("/api/health")
 def health():
     return {"status": "Birth Chart API is running!"}
@@ -62,9 +62,7 @@ _gemini_client = None
 
 def get_gemini_client():
     """Lazily create the Gemini client so a missing API key doesn't crash
-    the whole server on startup — only the /chat endpoint. Uses Google's
-    free-tier Gemini API (get a key at https://aistudio.google.com/apikey —
-    no credit card required)."""
+    the whole server on startup — only the /chat endpoint."""
     global _gemini_client
     if _gemini_client is None:
         api_key = os.environ.get("GEMINI_API_KEY")
@@ -171,7 +169,6 @@ How to keep it SHORT and PRECISE:
   statement, while keeping the traditional-tendency framing required
   above for hard topics (accidents, death, divorce, etc.) — brevity
   should never remove that framing, only the wordiness around it.
-
 """
 
 
@@ -184,7 +181,6 @@ def chat(req: ChatRequest):
         chart_json=json.dumps(req.chart, indent=2),
     )
 
-    # Gemini uses "model" instead of "assistant" for the AI's turns.
     contents = []
     if req.history:
         for turn in req.history:
@@ -199,14 +195,7 @@ def chat(req: ChatRequest):
             config=genai_types.GenerateContentConfig(
                 system_instruction=system,
                 max_output_tokens=600,
-                # Lower temperature makes answers more consistent and less
-                # prone to embellishing beyond what the chart data supports.
                 temperature=0.2,
-                # Gemini 2.5 Flash spends part of max_output_tokens on hidden
-                # "thinking" tokens before writing the visible reply. Left
-                # unset, thinking can consume the whole budget and leave the
-                # actual answer truncated/empty. Disabling it here keeps all
-                # tokens for the reply itself, which is all this app needs.
                 thinking_config=genai_types.ThinkingConfig(thinking_budget=0),
             ),
         )
@@ -223,16 +212,40 @@ def chat(req: ChatRequest):
 
 
 # ─────────────────────────────────────────────────────────────
-# Serve the built React frontend (deploy/frontend-src/build)
+# Serve the built React frontend (deploy/frontend-src/build or deploy/backend/build)
 # ─────────────────────────────────────────────────────────────
-# This MUST be the last thing registered: FastAPI/Starlette matches routes
-# in the order they were added, so /chart, /chat, and /api/health above all
-# still take priority. Anything else falls through to this mount, which
-# serves index.html for "/" and any unmatched path (html=True), and the
-# built JS/CSS assets under /static.
-_frontend_build = Path(__file__).resolve().parent.parent / "frontend-src" / "build"
-if _frontend_build.is_dir():
-    app.mount("/", StaticFiles(directory=_frontend_build, html=True), name="frontend")
+CURRENT_DIR = Path(__file__).resolve().parent
+REPO_ROOT_BUILD = CURRENT_DIR.parent.parent / "frontend-src" / "build"
+LOCAL_BACKEND_BUILD = CURRENT_DIR / "build"
+
+# Check where the build folder lives (root repo level or copied locally to backend)
+_frontend_build = None
+if REPO_ROOT_BUILD.is_dir():
+    _frontend_build = REPO_ROOT_BUILD
+elif LOCAL_BACKEND_BUILD.is_dir():
+    _frontend_build = LOCAL_BACKEND_BUILD
+
+if _frontend_build:
+    # Serve static assets (/static/js, /static/css)
+    static_folder = _frontend_build / "static"
+    if static_folder.is_dir():
+        app.mount("/static", StaticFiles(directory=static_folder), name="static")
+
+    # Serve direct files or fallback to index.html for client-side routing
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        # Prevent API paths from falling through to index.html
+        if full_path.startswith("api/") or full_path in ["chart", "chat"]:
+            raise HTTPException(status_code=404, detail="API endpoint not found")
+
+        target_file = _frontend_build / full_path
+        if full_path and target_file.is_file():
+            return FileResponse(target_file)
+
+        index_file = _frontend_build / "index.html"
+        if index_file.is_file():
+            return FileResponse(index_file)
+
+        raise HTTPException(status_code=404, detail="index.html not found in build directory")
 else:
-    # Local dev without a build present yet — don't crash, just skip it.
-    print(f"[startup] No frontend build found at {_frontend_build}, skipping static mount.")
+    print(f"[startup] No frontend build found at {REPO_ROOT_BUILD} or {LOCAL_BACKEND_BUILD}. Skipping static mount.")
