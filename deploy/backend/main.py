@@ -1,10 +1,12 @@
 import os
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from google import genai
@@ -44,9 +46,10 @@ def get_chart(data: BirthData):
     )
     return result
 
-# Health check
-@app.get("/")
-def root():
+# Health check (moved off "/" — that path now serves the React frontend,
+# see the StaticFiles mount at the bottom of this file)
+@app.get("/api/health")
+def health():
     return {"status": "Birth Chart API is running!"}
 
 
@@ -217,3 +220,19 @@ def chat(req: ChatRequest):
             detail="Gemini returned an empty response. Try asking again.",
         )
     return {"reply": reply_text}
+
+
+# ─────────────────────────────────────────────────────────────
+# Serve the built React frontend (deploy/frontend-src/build)
+# ─────────────────────────────────────────────────────────────
+# This MUST be the last thing registered: FastAPI/Starlette matches routes
+# in the order they were added, so /chart, /chat, and /api/health above all
+# still take priority. Anything else falls through to this mount, which
+# serves index.html for "/" and any unmatched path (html=True), and the
+# built JS/CSS assets under /static.
+_frontend_build = Path(__file__).resolve().parent.parent / "frontend-src" / "build"
+if _frontend_build.is_dir():
+    app.mount("/", StaticFiles(directory=_frontend_build, html=True), name="frontend")
+else:
+    # Local dev without a build present yet — don't crash, just skip it.
+    print(f"[startup] No frontend build found at {_frontend_build}, skipping static mount.")

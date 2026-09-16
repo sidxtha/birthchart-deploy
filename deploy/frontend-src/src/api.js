@@ -1,6 +1,9 @@
-// Base URL of the FastAPI backend. Set REACT_APP_API_URL in .env for
-// production; falls back to a typical local dev port.
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+// Base URL of the FastAPI backend. Set REACT_APP_API_URL in .env for local
+// development (see .env, which points at a locally-run backend). In
+// production the frontend is served by the same FastAPI app it talks to, so
+// when this is unset we fall back to '' and make same-origin requests
+// (e.g. fetch('/chart') instead of fetch('http://localhost:8000/chart')).
+const API_BASE_URL = process.env.REACT_APP_API_URL || '';
 
 /**
  * POST /chart — asks the backend to calculate the birth chart.
