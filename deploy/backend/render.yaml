@@ -3,11 +3,11 @@ services:
     name: birthchart-app
     env: python
     buildCommand: >
-      cd frontend-src &&
+      cd deploy/frontend-src &&
       npm install &&
       npm run build &&
-      cp -r build ../deploy/backend/build &&
-      cd ../deploy/backend &&
+      cp -r build ../backend/build &&
+      cd ../backend &&
       pip install -r requirements.txt
     startCommand: cd deploy/backend && uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
