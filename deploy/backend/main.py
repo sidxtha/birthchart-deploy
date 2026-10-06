@@ -97,7 +97,13 @@ Today's date (UTC): {today}
 Chart JSON:
 {chart_json}
 
+CURRENT DASHA (authoritative, copy these values exactly, never recompute or
+guess dates): {current_dasha}
+
 How to answer:
+- If the message is only a greeting (hi, hello, namaste), reply in ONE short
+  sentence welcoming them and asking what they want to know. Do NOT give a
+  chart reading unless they ask for one.
 - Start directly with the substance — name the placement and what it means
   in your first sentence. Do NOT open with throat-clearing like "That's a
   great question!" or "Let's take a look at your chart" — just answer.
@@ -187,32 +193,47 @@ How to keep it SHORT and PRECISE:
 
 
 MODELS = [
-    os.environ.get("GEMINI_MODEL", "gemini-3.5-flash"),
-    "gemini-3.1-flash-lite",  # fallback if the main model is overloaded
+    os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite"),
+    os.environ.get("GEMINI_FALLBACK_MODEL", "gemini-3.5-flash"),
 ]
 RETRYABLE = {429, 500, 503, 504}
+
+
+def _config(system, with_thinking=True):
+    kwargs = dict(
+        system_instruction=system,
+        max_output_tokens=600,
+        temperature=0.2,
+    )
+    if with_thinking:
+        kwargs["thinking_config"] = genai_types.ThinkingConfig(thinking_budget=0)
+    return genai_types.GenerateContentConfig(**kwargs)
 
 
 def generate_with_fallback(client, contents, system):
     last_err = None
     for model in MODELS:
-        for attempt in range(3):
+        with_thinking = True
+        for attempt in range(2):
+            t0 = time.time()
             try:
-                return client.models.generate_content(
+                resp = client.models.generate_content(
                     model=model,
                     contents=contents,
-                    config=genai_types.GenerateContentConfig(
-                        system_instruction=system,
-                        max_output_tokens=600,
-                        temperature=0.2,
-                        thinking_config=genai_types.ThinkingConfig(thinking_budget=0),
-                    ),
+                    config=_config(system, with_thinking),
                 )
+                print(f"[chat] {model} answered in {time.time() - t0:.1f}s")
+                return resp
             except Exception as e:
                 last_err = e
-                if getattr(e, "code", None) not in RETRYABLE:
-                    raise  # real error (bad key, bad config): don't retry
-                time.sleep(1.5 * (attempt + 1))  # 1.5s, 3s, 4.5s
+                code = getattr(e, "code", None)
+                print(f"[chat] {model} attempt {attempt + 1} failed ({code}) after {time.time() - t0:.1f}s")
+                if code == 400 and with_thinking and "thinking" in str(e).lower():
+                    with_thinking = False  # model rejects thinking_budget: retry without it
+                    continue
+                if code not in RETRYABLE:
+                    raise
+                time.sleep(1)
     raise last_err
 
 
@@ -222,7 +243,11 @@ def chat(req: ChatRequest):
 
     system = SYSTEM_PROMPT.format(
         today=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-        chart_json=json.dumps(req.chart, indent=2),
+        chart_json=json.dumps(req.chart, separators=(",", ":")),
+        current_dasha=json.dumps(
+            (req.chart.get("dasha") or {}).get("current", "not available"),
+            separators=(",", ":"),
+        ),
     )
 
     contents = []
