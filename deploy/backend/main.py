@@ -1,5 +1,6 @@
 import os
 import json
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
@@ -185,6 +186,36 @@ How to keep it SHORT and PRECISE:
 """
 
 
+MODELS = [
+    os.environ.get("GEMINI_MODEL", "gemini-3.5-flash"),
+    "gemini-3.1-flash-lite",  # fallback if the main model is overloaded
+]
+RETRYABLE = {429, 500, 503, 504}
+
+
+def generate_with_fallback(client, contents, system):
+    last_err = None
+    for model in MODELS:
+        for attempt in range(3):
+            try:
+                return client.models.generate_content(
+                    model=model,
+                    contents=contents,
+                    config=genai_types.GenerateContentConfig(
+                        system_instruction=system,
+                        max_output_tokens=600,
+                        temperature=0.2,
+                        thinking_config=genai_types.ThinkingConfig(thinking_budget=0),
+                    ),
+                )
+            except Exception as e:
+                last_err = e
+                if getattr(e, "code", None) not in RETRYABLE:
+                    raise  # real error (bad key, bad config): don't retry
+                time.sleep(1.5 * (attempt + 1))  # 1.5s, 3s, 4.5s
+    raise last_err
+
+
 @app.post("/chat")
 def chat(req: ChatRequest):
     client = get_gemini_client()
@@ -202,16 +233,7 @@ def chat(req: ChatRequest):
     contents.append({"role": "user", "parts": [{"text": req.question}]})
 
     try:
-        response = client.models.generate_content(
-            model="gemini-3.5-flash",
-            contents=contents,
-            config=genai_types.GenerateContentConfig(
-                system_instruction=system,
-                max_output_tokens=600,
-                temperature=0.2,
-                thinking_config=genai_types.ThinkingConfig(thinking_budget=0),
-            ),
-        )
+        response = generate_with_fallback(client, contents, system)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Gemini API error: {e}")
 
